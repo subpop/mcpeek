@@ -17,7 +17,7 @@ impl LogEntry {
     pub fn new(level: Level, target: &str, message: String) -> Self {
         // Get current timestamp in ISO 8601 format
         let timestamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        
+
         Self {
             timestamp,
             level: level.to_string(),
@@ -113,4 +113,3 @@ impl tracing::field::Visit for MessageVisitor {
         }
     }
 }
-

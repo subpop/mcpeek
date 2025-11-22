@@ -167,9 +167,7 @@ pub enum ToolContent {
         mime_type: String,
     },
     #[serde(rename = "resource")]
-    Resource {
-        resource: ResourceContents,
-    },
+    Resource { resource: ResourceContents },
 }
 
 // Prompts
@@ -286,7 +284,7 @@ mod tests {
     #[test]
     fn test_jsonrpc_request_new() {
         let request = JsonRpcRequest::new(1, "test_method", Some(json!({"key": "value"})));
-        
+
         assert_eq!(request.jsonrpc, "2.0");
         assert_eq!(request.id, Some(Value::Number(1.into())));
         assert_eq!(request.method, "test_method");
@@ -296,7 +294,7 @@ mod tests {
     #[test]
     fn test_jsonrpc_request_notification() {
         let notification = JsonRpcRequest::notification("test_notification", None);
-        
+
         assert_eq!(notification.jsonrpc, "2.0");
         assert!(notification.id.is_none());
         assert_eq!(notification.method, "test_notification");
@@ -308,7 +306,7 @@ mod tests {
         let request = JsonRpcRequest::new(42, "initialize", Some(json!({"version": "1.0"})));
         let json_str = serde_json::to_string(&request).unwrap();
         let parsed: JsonRpcRequest = serde_json::from_str(&json_str).unwrap();
-        
+
         assert_eq!(parsed.jsonrpc, "2.0");
         assert_eq!(parsed.id, Some(Value::Number(42.into())));
         assert_eq!(parsed.method, "initialize");
@@ -322,10 +320,10 @@ mod tests {
             result: Some(json!({"status": "ok"})),
             error: None,
         };
-        
+
         let json_str = serde_json::to_string(&response).unwrap();
         let parsed: JsonRpcResponse = serde_json::from_str(&json_str).unwrap();
-        
+
         assert!(parsed.result.is_some());
         assert!(parsed.error.is_none());
     }
@@ -342,10 +340,10 @@ mod tests {
                 data: None,
             }),
         };
-        
+
         let json_str = serde_json::to_string(&response).unwrap();
         let parsed: JsonRpcResponse = serde_json::from_str(&json_str).unwrap();
-        
+
         assert!(parsed.result.is_none());
         assert!(parsed.error.is_some());
         assert_eq!(parsed.error.unwrap().code, -32600);
@@ -356,9 +354,7 @@ mod tests {
         let params = InitializeParams {
             protocol_version: "2024-11-05".to_string(),
             capabilities: ClientCapabilities {
-                roots: Some(RootsCapability {
-                    list_changed: true,
-                }),
+                roots: Some(RootsCapability { list_changed: true }),
                 sampling: None,
             },
             client_info: Implementation {
@@ -366,11 +362,11 @@ mod tests {
                 version: "1.0.0".to_string(),
             },
         };
-        
+
         let json_str = serde_json::to_string(&params).unwrap();
         assert!(json_str.contains("protocolVersion"));
         assert!(json_str.contains("clientInfo"));
-        
+
         let parsed: InitializeParams = serde_json::from_str(&json_str).unwrap();
         assert_eq!(parsed.protocol_version, "2024-11-05");
         assert_eq!(parsed.client_info.name, "test_client");
@@ -389,7 +385,7 @@ mod tests {
                 version: "1.0".to_string(),
             },
         };
-        
+
         let json_str = serde_json::to_string(&params).unwrap();
         assert!(!json_str.contains("roots"));
         assert!(!json_str.contains("sampling"));
@@ -415,10 +411,10 @@ mod tests {
                 }
             }),
         };
-        
+
         let json_str = serde_json::to_string(&tool).unwrap();
         assert!(json_str.contains("inputSchema"));
-        
+
         let parsed: Tool = serde_json::from_str(&json_str).unwrap();
         assert_eq!(parsed.name, "test_tool");
         assert_eq!(parsed.description, Some("A test tool".to_string()));
@@ -429,11 +425,11 @@ mod tests {
         let content = ToolContent::Text {
             text: "Hello, world!".to_string(),
         };
-        
+
         let json_str = serde_json::to_string(&content).unwrap();
         assert!(json_str.contains(r#""type":"text"#));
         assert!(json_str.contains("Hello, world!"));
-        
+
         let parsed: ToolContent = serde_json::from_str(&json_str).unwrap();
         match parsed {
             ToolContent::Text { text } => assert_eq!(text, "Hello, world!"),
@@ -447,11 +443,11 @@ mod tests {
             data: "base64data".to_string(),
             mime_type: "image/png".to_string(),
         };
-        
+
         let json_str = serde_json::to_string(&content).unwrap();
         assert!(json_str.contains(r#""type":"image"#));
         assert!(json_str.contains("mimeType"));
-        
+
         let parsed: ToolContent = serde_json::from_str(&json_str).unwrap();
         match parsed {
             ToolContent::Image { data, mime_type } => {
@@ -466,15 +462,15 @@ mod tests {
     fn test_call_tool_params() {
         let mut args = HashMap::new();
         args.insert("param1".to_string(), json!("value1"));
-        
+
         let params = CallToolParams {
             name: "my_tool".to_string(),
             arguments: Some(args),
         };
-        
+
         let json_str = serde_json::to_string(&params).unwrap();
         let parsed: CallToolParams = serde_json::from_str(&json_str).unwrap();
-        
+
         assert_eq!(parsed.name, "my_tool");
         assert!(parsed.arguments.is_some());
     }
@@ -487,10 +483,10 @@ mod tests {
             }],
             is_error: Some(false),
         };
-        
+
         let json_str = serde_json::to_string(&result).unwrap();
         assert!(json_str.contains("isError"));
-        
+
         let parsed: CallToolResult = serde_json::from_str(&json_str).unwrap();
         assert_eq!(parsed.content.len(), 1);
         assert_eq!(parsed.is_error, Some(false));
@@ -507,10 +503,10 @@ mod tests {
                 required: Some(true),
             }]),
         };
-        
+
         let json_str = serde_json::to_string(&prompt).unwrap();
         let parsed: Prompt = serde_json::from_str(&json_str).unwrap();
-        
+
         assert_eq!(parsed.name, "test_prompt");
         assert_eq!(parsed.arguments.unwrap().len(), 1);
     }
@@ -520,10 +516,10 @@ mod tests {
         let text_content = PromptContent::Text {
             text: "Prompt text".to_string(),
         };
-        
+
         let json_str = serde_json::to_string(&text_content).unwrap();
         assert!(json_str.contains(r#""type":"text"#));
-        
+
         let parsed: PromptContent = serde_json::from_str(&json_str).unwrap();
         match parsed {
             PromptContent::Text { text } => assert_eq!(text, "Prompt text"),
@@ -539,10 +535,10 @@ mod tests {
             description: Some("A test file".to_string()),
             mime_type: Some("text/plain".to_string()),
         };
-        
+
         let json_str = serde_json::to_string(&resource).unwrap();
         assert!(json_str.contains("mimeType"));
-        
+
         let parsed: Resource = serde_json::from_str(&json_str).unwrap();
         assert_eq!(parsed.uri, "file:///test.txt");
         assert_eq!(parsed.mime_type, Some("text/plain".to_string()));
@@ -555,10 +551,10 @@ mod tests {
             text: "File contents".to_string(),
             mime_type: Some("text/plain".to_string()),
         };
-        
+
         let json_str = serde_json::to_string(&contents).unwrap();
         assert!(json_str.contains(r#""text":"File contents"#));
-        
+
         let parsed: ResourceContents = serde_json::from_str(&json_str).unwrap();
         match parsed {
             ResourceContents::Text { uri, text, .. } => {
@@ -576,10 +572,10 @@ mod tests {
             blob: "base64data".to_string(),
             mime_type: Some("application/octet-stream".to_string()),
         };
-        
+
         let json_str = serde_json::to_string(&contents).unwrap();
         assert!(json_str.contains(r#""blob":"base64data"#));
-        
+
         let parsed: ResourceContents = serde_json::from_str(&json_str).unwrap();
         match parsed {
             ResourceContents::Blob { blob, .. } => {
@@ -593,15 +589,15 @@ mod tests {
     fn test_get_prompt_params() {
         let mut args = HashMap::new();
         args.insert("key".to_string(), "value".to_string());
-        
+
         let params = GetPromptParams {
             name: "my_prompt".to_string(),
             arguments: Some(args),
         };
-        
+
         let json_str = serde_json::to_string(&params).unwrap();
         let parsed: GetPromptParams = serde_json::from_str(&json_str).unwrap();
-        
+
         assert_eq!(parsed.name, "my_prompt");
         assert!(parsed.arguments.is_some());
     }
@@ -611,10 +607,10 @@ mod tests {
         let params = ReadResourceParams {
             uri: "file:///test.txt".to_string(),
         };
-        
+
         let json_str = serde_json::to_string(&params).unwrap();
         let parsed: ReadResourceParams = serde_json::from_str(&json_str).unwrap();
-        
+
         assert_eq!(parsed.uri, "file:///test.txt");
     }
 
@@ -627,10 +623,10 @@ mod tests {
                 input_schema: json!({}),
             }],
         };
-        
+
         let json_str = serde_json::to_string(&result).unwrap();
         let parsed: ListToolsResult = serde_json::from_str(&json_str).unwrap();
-        
+
         assert_eq!(parsed.tools.len(), 1);
         assert_eq!(parsed.tools[0].name, "tool1");
     }
@@ -649,10 +645,10 @@ mod tests {
                 version: "1.0".to_string(),
             },
         };
-        
+
         let json_str = serde_json::to_string(&params).unwrap();
         let json_value: Value = serde_json::from_str(&json_str).unwrap();
-        
+
         assert!(json_value.get("protocolVersion").is_some());
         assert!(json_value.get("clientInfo").is_some());
         assert!(json_value.get("protocol_version").is_none());

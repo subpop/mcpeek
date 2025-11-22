@@ -184,13 +184,17 @@ impl McpClient {
             anyhow::bail!("RPC error: {} (code: {})", error.message, error.code);
         }
 
-        let result = response
-            .result
-            .context("Response missing result field")?;
+        let result = response.result.context("Response missing result field")?;
 
-        debug!("Deserializing result: {}", serde_json::to_string_pretty(&result).unwrap_or_default());
+        debug!(
+            "Deserializing result: {}",
+            serde_json::to_string_pretty(&result).unwrap_or_default()
+        );
         serde_json::from_value(result.clone()).with_context(|| {
-            format!("Failed to deserialize result: {}", serde_json::to_string_pretty(&result).unwrap_or_default())
+            format!(
+                "Failed to deserialize result: {}",
+                serde_json::to_string_pretty(&result).unwrap_or_default()
+            )
         })
     }
 
@@ -254,9 +258,7 @@ impl McpClient {
     }
 
     pub async fn list_resources(&self) -> Result<Vec<Resource>> {
-        let result: ListResourcesResult = self
-            .call_method("resources/list", None::<()>)
-            .await?;
+        let result: ListResourcesResult = self.call_method("resources/list", None::<()>).await?;
         Ok(result.resources)
     }
 
@@ -265,7 +267,9 @@ impl McpClient {
             uri: uri.to_string(),
         };
 
-        let result: ReadResourceResult = self.call_method("resources/read", Some(params)).await
+        let result: ReadResourceResult = self
+            .call_method("resources/read", Some(params))
+            .await
             .context("Failed to call resources/read")?;
         Ok(result.contents)
     }
@@ -308,11 +312,11 @@ mod tests {
     #[test]
     fn test_request_id_increments() {
         let request_id = AtomicI64::new(1);
-        
+
         let id1 = request_id.fetch_add(1, Ordering::SeqCst);
         let id2 = request_id.fetch_add(1, Ordering::SeqCst);
         let id3 = request_id.fetch_add(1, Ordering::SeqCst);
-        
+
         assert_eq!(id1, 1);
         assert_eq!(id2, 2);
         assert_eq!(id3, 3);
@@ -322,7 +326,7 @@ mod tests {
     fn test_jsonrpc_request_serialization() {
         let request = JsonRpcRequest::new(1, "initialize", Some(json!({"test": "value"})));
         let json_str = serde_json::to_string(&request).unwrap();
-        
+
         assert!(json_str.contains("\"jsonrpc\":\"2.0\""));
         assert!(json_str.contains("\"id\":1"));
         assert!(json_str.contains("\"method\":\"initialize\""));
@@ -333,7 +337,7 @@ mod tests {
     fn test_notification_serialization() {
         let notification = JsonRpcRequest::notification("notifications/initialized", None);
         let json_str = serde_json::to_string(&notification).unwrap();
-        
+
         assert!(json_str.contains("\"jsonrpc\":\"2.0\""));
         assert!(json_str.contains("\"method\":\"notifications/initialized\""));
         assert!(!json_str.contains("\"id\""));
@@ -347,7 +351,7 @@ mod tests {
             result: Some(json!({"success": true})),
             error: None,
         };
-        
+
         let msg = ResponseMessage::Response(response.clone());
         match msg {
             ResponseMessage::Response(r) => {
@@ -362,7 +366,7 @@ mod tests {
     async fn test_notification_message() {
         let notification = JsonRpcRequest::notification("test", None);
         let msg = ResponseMessage::Notification(notification.clone());
-        
+
         match msg {
             ResponseMessage::Notification(n) => {
                 assert_eq!(n.method, "test");
@@ -385,7 +389,7 @@ mod tests {
                 version: "0.1.0".to_string(),
             },
         };
-        
+
         assert_eq!(params.protocol_version, "2024-11-05");
         assert_eq!(params.client_info.name, "mcpcli");
     }
@@ -395,12 +399,12 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("param1".to_string(), json!("value1"));
         args.insert("param2".to_string(), json!(42));
-        
+
         let params = CallToolParams {
             name: "my_tool".to_string(),
             arguments: Some(args),
         };
-        
+
         assert_eq!(params.name, "my_tool");
         assert_eq!(params.arguments.as_ref().unwrap().len(), 2);
     }
@@ -409,12 +413,12 @@ mod tests {
     fn test_get_prompt_params_construction() {
         let mut args = HashMap::new();
         args.insert("arg1".to_string(), "val1".to_string());
-        
+
         let params = GetPromptParams {
             name: "test_prompt".to_string(),
             arguments: Some(args),
         };
-        
+
         assert_eq!(params.name, "test_prompt");
         assert!(params.arguments.is_some());
     }
@@ -424,21 +428,21 @@ mod tests {
         let params = ReadResourceParams {
             uri: "file:///path/to/resource".to_string(),
         };
-        
+
         assert_eq!(params.uri, "file:///path/to/resource");
     }
 
     #[tokio::test]
     async fn test_pending_requests_map() {
-        let pending: Arc<Mutex<HashMap<i64, oneshot::Sender<JsonRpcResponse>>>> = 
+        let pending: Arc<Mutex<HashMap<i64, oneshot::Sender<JsonRpcResponse>>>> =
             Arc::new(Mutex::new(HashMap::new()));
         let (tx, _rx) = oneshot::channel();
-        
+
         {
             let mut map = pending.lock().await;
             map.insert(1i64, tx);
         }
-        
+
         let map = pending.lock().await;
         assert!(map.contains_key(&1i64));
     }
@@ -446,7 +450,7 @@ mod tests {
     #[tokio::test]
     async fn test_server_info_storage() {
         let server_info = Arc::new(Mutex::new(None));
-        
+
         let info = InitializeResult {
             protocol_version: "2024-11-05".to_string(),
             capabilities: ServerCapabilities::default(),
@@ -455,9 +459,9 @@ mod tests {
                 version: "1.0.0".to_string(),
             },
         };
-        
+
         *server_info.lock().await = Some(info.clone());
-        
+
         let stored = server_info.lock().await;
         assert!(stored.is_some());
         assert_eq!(stored.as_ref().unwrap().server_info.name, "test_server");
@@ -470,7 +474,7 @@ mod tests {
             message: "Invalid Request".to_string(),
             data: Some(json!({"details": "Additional info"})),
         };
-        
+
         assert_eq!(error.code, -32600);
         assert_eq!(error.message, "Invalid Request");
         assert!(error.data.is_some());
