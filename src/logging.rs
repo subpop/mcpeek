@@ -27,7 +27,7 @@ impl LogEntry {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct LogBuffer {
     entries: Arc<Mutex<Vec<LogEntry>>>,
 }
