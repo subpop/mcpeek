@@ -421,34 +421,31 @@ fn render_debug_logs(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_help(f: &mut Frame, app: &App, area: Rect) {
-    let help_text = if app.tool_call_input_mode {
-        "TAB/Shift+TAB: Navigate Fields | ↑/↓: Scroll | Type: Enter Value | ENTER: Execute | ESC: Cancel"
-    } else if app.prompt_input_mode {
-        "TAB/Shift+TAB: Navigate Fields | ↑/↓: Scroll | Type: Enter Value | ENTER: Get Prompt | ESC: Cancel"
-    } else if app.detail_view.is_some() {
-        if app.current_tab == Tab::Tools {
-            "↑/↓: Scroll | C: Call Tool | ESC: Close | Q: Quit"
-        } else if app.current_tab == Tab::Prompts {
-            "↑/↓: Scroll | C: Get Prompt | ESC: Close | Q: Quit"
-        } else if app.current_tab == Tab::Resources {
-            "↑/↓: Scroll | C: Read Resource | ESC: Close | Q: Quit"
-        } else {
-            "↑/↓: Scroll | ESC: Close | Q: Quit"
-        }
-    } else if app.current_tab == Tab::ServerLogs {
-        "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Scroll | E: Jump to End | S: Save Logs | R: Refresh | Q: Quit"
-    } else if app.current_tab == Tab::DebugLogs {
-        "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Scroll | E: Jump to End | S: Save Logs | R: Refresh | Q: Quit"
-    } else if app.current_tab == Tab::ServerInfo {
-        "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Scroll | ENTER: Details | R: Refresh | Q: Quit"
-    } else if app.current_tab == Tab::Tools {
-        "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Navigate | ENTER: Details | C: Call Tool | R: Refresh | Q: Quit"
-    } else if app.current_tab == Tab::Prompts {
-        "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Navigate | ENTER: Details | C: Get Prompt | R: Refresh | Q: Quit"
-    } else if app.current_tab == Tab::Resources {
-        "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Navigate | ENTER: Details | C: Read Resource | R: Refresh | Q: Quit"
-    } else {
-        "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Navigate | ENTER: Details | R: Refresh | Q: Quit"
+    let help_text = match (app.tool_call_input_mode, app.prompt_input_mode, &app.detail_view, app.current_tab) {
+        (true, _, _, _) => 
+            "TAB/Shift+TAB: Navigate Fields | ↑/↓: Scroll | Type: Enter Value | ENTER: Execute | ESC: Cancel",
+        (_, true, _, _) => 
+            "TAB/Shift+TAB: Navigate Fields | ↑/↓: Scroll | Type: Enter Value | ENTER: Get Prompt | ESC: Cancel",
+        (_, _, Some(_), Tab::Tools) => 
+            "↑/↓: Scroll | C: Call Tool | ESC: Close | Q: Quit",
+        (_, _, Some(_), Tab::Prompts) => 
+            "↑/↓: Scroll | C: Get Prompt | ESC: Close | Q: Quit",
+        (_, _, Some(_), Tab::Resources) => 
+            "↑/↓: Scroll | C: Read Resource | ESC: Close | Q: Quit",
+        (_, _, Some(_), _) => 
+            "↑/↓: Scroll | ESC: Close | Q: Quit",
+        (_, _, None, Tab::ServerLogs) => 
+            "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Scroll | E: Jump to End | S: Save Logs | R: Refresh | Q: Quit",
+        (_, _, None, Tab::DebugLogs) => 
+            "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Scroll | E: Jump to End | S: Save Logs | R: Refresh | Q: Quit",
+        (_, _, None, Tab::ServerInfo) => 
+            "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Scroll | ENTER: Details | R: Refresh | Q: Quit",
+        (_, _, None, Tab::Tools) => 
+            "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Navigate | ENTER: Details | C: Call Tool | R: Refresh | Q: Quit",
+        (_, _, None, Tab::Prompts) => 
+            "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Navigate | ENTER: Details | C: Get Prompt | R: Refresh | Q: Quit",
+        (_, _, None, Tab::Resources) => 
+            "TAB: Next Tab | ←/→: Switch Tabs | ↑/↓: Navigate | ENTER: Details | C: Read Resource | R: Refresh | Q: Quit",
     };
 
     let help = Paragraph::new(help_text)
