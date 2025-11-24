@@ -16,16 +16,16 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            name: crank-linux-x86_64
+            name: mcpeek-linux-x86_64
           - target: x86_64-apple-darwin
             os: macos-latest
-            name: crank-macos-x86_64
+            name: mcpeek-macos-x86_64
           - target: aarch64-apple-darwin
             os: macos-latest
-            name: crank-macos-aarch64
+            name: mcpeek-macos-aarch64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            name: crank-windows-x86_64.exe
+            name: mcpeek-windows-x86_64.exe
     
     runs-on: ${{ matrix.os }}
     
@@ -55,20 +55,20 @@ jobs:
 
       - name: Strip binary (Linux and macOS)
         if: matrix.os != 'windows-latest'
-        run: strip target/${{ matrix.target }}/release/crank
+        run: strip target/${{ matrix.target }}/release/mcpeek
 
       - name: Prepare binary (Linux and macOS)
         if: matrix.os != 'windows-latest'
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/crank dist/${{ matrix.name }}
+          cp target/${{ matrix.target }}/release/mcpeek dist/${{ matrix.name }}
           chmod +x dist/${{ matrix.name }}
 
       - name: Prepare binary (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           mkdir dist
-          cp target/${{ matrix.target }}/release/crank.exe dist/${{ matrix.name }}
+          cp target/${{ matrix.target }}/release/mcpeek.exe dist/${{ matrix.name }}
 
       - name: Create tarball (Linux and macOS)
         if: matrix.os != 'windows-latest'
