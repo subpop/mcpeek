@@ -56,6 +56,7 @@ impl LogBuffer {
             .unwrap_or_default()
     }
 
+    #[allow(dead_code)]
     pub fn clear(&self) {
         if let Ok(mut entries) = self.entries.lock() {
             entries.clear();

@@ -457,12 +457,12 @@ impl App {
         if self.tool_call_input_mode {
             self.tool_call_inputs
                 .entry(field_name.clone())
-                .or_insert_with(String::new)
+                .or_default()
                 .push(c);
         } else if self.prompt_input_mode {
             self.prompt_inputs
                 .entry(field_name.clone())
-                .or_insert_with(String::new)
+                .or_default()
                 .push(c);
         }
     }
@@ -870,7 +870,7 @@ fn format_prompt_result(prompt_name: &str, result: &GetPromptResult) -> String {
             PromptMessageContent::Multiple(contents) => {
                 for (j, content) in contents.iter().enumerate() {
                     if j > 0 {
-                        output.push_str("\n");
+                        output.push('\n');
                     }
                     format_prompt_content(&mut output, content);
                 }

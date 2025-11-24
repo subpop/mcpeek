@@ -14,7 +14,9 @@ pub struct McpClient {
     child: Arc<Mutex<Child>>,
     stdin: Arc<Mutex<ChildStdin>>,
     request_id: AtomicI64,
+    #[allow(dead_code)]
     response_tx: mpsc::UnboundedSender<ResponseMessage>,
+    #[allow(dead_code)]
     response_rx: Arc<Mutex<mpsc::UnboundedReceiver<ResponseMessage>>>,
     pending_requests: Arc<Mutex<HashMap<i64, oneshot::Sender<JsonRpcResponse>>>>,
     server_info: Arc<Mutex<Option<InitializeResult>>>,
@@ -22,7 +24,9 @@ pub struct McpClient {
 }
 
 enum ResponseMessage {
+    #[allow(dead_code)]
     Response(JsonRpcResponse),
+    #[allow(dead_code)]
     Notification(JsonRpcRequest),
 }
 
