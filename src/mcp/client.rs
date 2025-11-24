@@ -210,7 +210,7 @@ impl McpClient {
                 sampling: None,
             },
             client_info: Implementation {
-                name: "mcpcli".to_string(),
+                name: env!("CARGO_PKG_NAME").to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
         };
@@ -389,13 +389,13 @@ mod tests {
                 sampling: None,
             },
             client_info: Implementation {
-                name: "mcpcli".to_string(),
+                name: env!("CARGO_PKG_NAME").to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
         };
 
         assert_eq!(params.protocol_version, "2024-11-05");
-        assert_eq!(params.client_info.name, "mcpcli");
+        assert_eq!(params.client_info.name, env!("CARGO_PKG_NAME"));
     }
 
     #[test]
