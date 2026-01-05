@@ -13,10 +13,7 @@ use crossterm::{
 };
 use logging::{LogBuffer, LogBufferLayer};
 use mcp::McpClient;
-use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    Terminal,
-};
+use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use tracing::Level;
 use tracing_subscriber::layer::SubscriberExt;
@@ -97,8 +94,8 @@ async fn run_tui(
     res
 }
 
-async fn run_tui_loop<B: Backend>(
-    terminal: &mut Terminal<B>,
+async fn run_tui_loop(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     app: &mut App,
     client: &McpClient,
     log_buffer: LogBuffer,
