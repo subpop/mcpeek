@@ -1,0 +1,68 @@
+{
+  "manual_version": "1.0.0",
+  "utcp_version": "1.0.1",
+  "info": {
+    "title": "Tools with Variables",
+    "version": "1.0.0",
+    "description": "Tools demonstrating variable substitution"
+  },
+  "variables": {
+    "BASE_URL": "https://api.example.com",
+    "DEFAULT_PORT": "8080"
+  },
+  "tools": [
+    {
+      "name": "api_call",
+      "description": "Make an API call using variables",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "description": "API endpoint path"
+          }
+        },
+        "required": ["endpoint"]
+      },
+      "outputs": {
+        "type": "object"
+      },
+      "tags": ["api", "http"],
+      "tool_call_template": {
+        "call_template_type": "http",
+        "url": "${BASE_URL}/{endpoint}",
+        "http_method": "GET",
+        "headers": {
+          "X-Port": "${DEFAULT_PORT}"
+        }
+      }
+    },
+    {
+      "name": "authenticated_request",
+      "description": "Make an authenticated API request",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "description": "Resource to fetch"
+          }
+        },
+        "required": ["resource"]
+      },
+      "outputs": {
+        "type": "object"
+      },
+      "tags": ["api", "auth"],
+      "tool_call_template": {
+        "call_template_type": "http",
+        "url": "https://jsonplaceholder.typicode.com/{resource}",
+        "http_method": "GET",
+        "auth": {
+          "auth_type": "bearer",
+          "token": "${API_TOKEN}"
+        }
+      }
+    }
+  ]
+}

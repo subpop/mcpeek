@@ -1,6 +1,6 @@
 use crate::logging::LogEntry;
 use crate::mcp::protocol::*;
-use crate::mcp::McpClient;
+use crate::protocol::ProtocolClient;
 use anyhow::Result;
 use serde::Serialize;
 use serde_json::Value;
@@ -141,14 +141,22 @@ impl App {
         }
     }
 
-    pub async fn load_data(&mut self, client: &McpClient) -> Result<()> {
+    pub async fn load_data(&mut self, client: &dyn ProtocolClient) -> Result<()> {
         self.loading = true;
         self.error_message = None;
 
         match self.current_tab {
             Tab::Tools => match client.list_tools().await {
-                Ok(tools) => {
-                    self.tools = tools;
+                Ok(protocol_tools) => {
+                    // Convert protocol tools to MCP tools for UI
+                    self.tools = protocol_tools
+                        .into_iter()
+                        .map(|t| Tool {
+                            name: t.name,
+                            description: t.description,
+                            input_schema: t.input_schema,
+                        })
+                        .collect();
                     if self.selected_tool >= self.tools.len() && !self.tools.is_empty() {
                         self.selected_tool = self.tools.len() - 1;
                     }
@@ -158,8 +166,25 @@ impl App {
                 }
             },
             Tab::Prompts => match client.list_prompts().await {
-                Ok(prompts) => {
-                    self.prompts = prompts;
+                Ok(protocol_prompts) => {
+                    // Convert protocol prompts to MCP prompts for UI
+                    self.prompts = protocol_prompts
+                        .into_iter()
+                        .map(|p| Prompt {
+                            name: p.name,
+                            description: p.description,
+                            arguments: Some(
+                                p.arguments
+                                    .into_iter()
+                                    .map(|a| PromptArgument {
+                                        name: a.name,
+                                        description: a.description,
+                                        required: Some(a.required),
+                                    })
+                                    .collect(),
+                            ),
+                        })
+                        .collect();
                     if self.selected_prompt >= self.prompts.len() && !self.prompts.is_empty() {
                         self.selected_prompt = self.prompts.len() - 1;
                     }
@@ -169,8 +194,17 @@ impl App {
                 }
             },
             Tab::Resources => match client.list_resources().await {
-                Ok(resources) => {
-                    self.resources = resources;
+                Ok(protocol_resources) => {
+                    // Convert protocol resources to MCP resources for UI
+                    self.resources = protocol_resources
+                        .into_iter()
+                        .map(|r| Resource {
+                            uri: r.uri,
+                            name: r.name,
+                            description: r.description,
+                            mime_type: r.mime_type,
+                        })
+                        .collect();
                     if self.selected_resource >= self.resources.len() && !self.resources.is_empty()
                     {
                         self.selected_resource = self.resources.len() - 1;
@@ -181,7 +215,17 @@ impl App {
                 }
             },
             Tab::ServerInfo => {
-                self.server_info = client.get_server_info().await;
+                if let Some(info) = client.get_server_info().await {
+                    // Convert protocol ServerInfo to MCP InitializeResult
+                    self.server_info = Some(InitializeResult {
+                        protocol_version: "".to_string(), // Not available in protocol
+                        capabilities: ServerCapabilities::default(),
+                        server_info: Implementation {
+                            name: info.name,
+                            version: info.version,
+                        },
+                    });
+                }
             }
             Tab::ServerLogs => {
                 let new_logs = client.get_logs().await;
@@ -196,7 +240,7 @@ impl App {
         Ok(())
     }
 
-    pub async fn update_logs(&mut self, client: &McpClient) {
+    pub async fn update_logs(&mut self, client: &dyn ProtocolClient) {
         let new_logs = client.get_logs().await;
         self.logs.extend(new_logs);
     }
@@ -484,7 +528,7 @@ impl App {
         }
     }
 
-    pub async fn execute_tool_call(&mut self, client: &McpClient) {
+    pub async fn execute_tool_call(&mut self, client: &dyn ProtocolClient) {
         if self.tools.is_empty() {
             return;
         }
@@ -566,12 +610,39 @@ impl App {
             )
             .await
         {
-            Ok(result) => {
-                self.tool_call_result = Some(result.clone());
+            Ok(protocol_result) => {
+                // Convert protocol result to MCP result for UI
+                let mcp_result = CallToolResult {
+                    content: protocol_result
+                        .content
+                        .into_iter()
+                        .map(|item| match item {
+                            crate::protocol::ContentItem::Text(text) => ToolContent::Text { text },
+                            crate::protocol::ContentItem::Image { data, mime_type } => {
+                                ToolContent::Image { data, mime_type }
+                            }
+                            crate::protocol::ContentItem::Binary { data, mime_type } => {
+                                // Convert binary to base64 blob for MCP format
+                                use base64::{engine::general_purpose, Engine as _};
+                                let blob = general_purpose::STANDARD.encode(&data);
+                                ToolContent::Resource {
+                                    resource: ResourceContents::Blob {
+                                        uri: "data://binary".to_string(),
+                                        blob,
+                                        mime_type: Some(mime_type),
+                                    },
+                                }
+                            }
+                        })
+                        .collect(),
+                    is_error: Some(protocol_result.is_error),
+                };
+
+                self.tool_call_result = Some(mcp_result.clone());
                 self.tool_call_input_mode = false;
 
                 // Show result in detail view
-                let detail = format_tool_result(&tool_name, &result);
+                let detail = format_tool_result(&tool_name, &mcp_result);
                 self.detail_view = Some(detail);
             }
             Err(e) => {
@@ -626,7 +697,7 @@ impl App {
         self.prompt_result = None;
     }
 
-    pub async fn execute_prompt_get(&mut self, client: &McpClient) {
+    pub async fn execute_prompt_get(&mut self, client: &dyn ProtocolClient) {
         if self.prompts.is_empty() {
             return;
         }
@@ -672,12 +743,27 @@ impl App {
             )
             .await
         {
-            Ok(result) => {
-                self.prompt_result = Some(result.clone());
+            Ok(protocol_result) => {
+                // Convert protocol result to MCP result for UI
+                let mcp_result = GetPromptResult {
+                    description: protocol_result.description,
+                    messages: protocol_result
+                        .messages
+                        .into_iter()
+                        .map(|m| PromptMessage {
+                            role: m.role,
+                            content: PromptMessageContent::Single(PromptContent::Text {
+                                text: m.content,
+                            }),
+                        })
+                        .collect(),
+                };
+
+                self.prompt_result = Some(mcp_result.clone());
                 self.prompt_input_mode = false;
 
                 // Show result in detail view
-                let detail = format_prompt_result(&prompt_name, &result);
+                let detail = format_prompt_result(&prompt_name, &mcp_result);
                 self.detail_view = Some(detail);
             }
             Err(e) => {
@@ -694,7 +780,7 @@ impl App {
         self.tool_input_scroll = 0;
     }
 
-    pub async fn read_resource(&mut self, client: &McpClient) {
+    pub async fn read_resource(&mut self, client: &dyn ProtocolClient) {
         if self.resources.is_empty() {
             return;
         }
@@ -704,11 +790,42 @@ impl App {
         let resource_name = resource.name.clone();
 
         match client.read_resource(&uri).await {
-            Ok(contents) => {
-                self.resource_read_result = Some(contents.clone());
+            Ok(protocol_result) => {
+                // Convert protocol result to MCP result for UI
+                let mcp_contents: Vec<ResourceContents> = protocol_result
+                    .contents
+                    .into_iter()
+                    .map(|item| match item {
+                        crate::protocol::ResourceContent::Text {
+                            uri,
+                            text,
+                            mime_type,
+                        } => ResourceContents::Text {
+                            uri,
+                            text,
+                            mime_type,
+                        },
+                        crate::protocol::ResourceContent::Binary {
+                            uri,
+                            data,
+                            mime_type,
+                        } => {
+                            // Convert binary to base64 blob for MCP format
+                            use base64::{engine::general_purpose, Engine as _};
+                            let blob = general_purpose::STANDARD.encode(&data);
+                            ResourceContents::Blob {
+                                uri,
+                                blob,
+                                mime_type,
+                            }
+                        }
+                    })
+                    .collect();
+
+                self.resource_read_result = Some(mcp_contents.clone());
 
                 // Show result in detail view
-                let detail = format_resource_read_result(&resource_name, &uri, &contents);
+                let detail = format_resource_read_result(&resource_name, &uri, &mcp_contents);
                 self.detail_view = Some(detail);
                 self.error_message = None; // Clear any previous errors
             }

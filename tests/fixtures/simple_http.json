@@ -1,0 +1,58 @@
+{
+  "manual_version": "1.0.0",
+  "utcp_version": "1.0.1",
+  "info": {
+    "title": "Simple HTTP Tools",
+    "version": "1.0.0",
+    "description": "A simple collection of HTTP tools for testing"
+  },
+  "variables": {},
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Get weather information for a city",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "Name of the city"
+          }
+        },
+        "required": ["city"]
+      },
+      "outputs": {
+        "type": "object"
+      },
+      "tags": ["weather", "http"],
+      "tool_call_template": {
+        "call_template_type": "http",
+        "url": "https://wttr.in/{city}?format=j1",
+        "http_method": "GET"
+      }
+    },
+    {
+      "name": "json_placeholder",
+      "description": "Get a sample post from JSONPlaceholder",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "integer",
+            "description": "ID of the post"
+          }
+        },
+        "required": ["post_id"]
+      },
+      "outputs": {
+        "type": "object"
+      },
+      "tags": ["test", "http"],
+      "tool_call_template": {
+        "call_template_type": "http",
+        "url": "https://jsonplaceholder.typicode.com/posts/{post_id}",
+        "http_method": "GET"
+      }
+    }
+  ]
+}

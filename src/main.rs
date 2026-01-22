@@ -1,6 +1,8 @@
 mod logging;
 mod mcp;
+mod protocol;
 mod tui;
+mod utcp;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -13,6 +15,7 @@ use crossterm::{
 };
 use logging::{LogBuffer, LogBufferLayer};
 use mcp::McpClient;
+use protocol::ProtocolClient;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
@@ -22,13 +25,24 @@ use tracing::Level;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tui::{render_ui, App};
+use utcp::UtcpClient;
 
 #[derive(Parser)]
 #[command(name = "mcpeek")]
-#[command(about = "MCP Server Inspector - Interactive TUI for Model Context Protocol servers", long_about = None)]
+#[command(about = "Protocol Inspector - Interactive TUI for MCP servers and UTCP manuals", long_about = None)]
 struct Cli {
-    #[arg(help = "Command to run the MCP server")]
-    command: String,
+    #[arg(
+        long,
+        help = "Path to UTCP manual JSON file",
+        conflicts_with = "command"
+    )]
+    utcp: Option<String>,
+
+    #[arg(
+        help = "Command to run the MCP server",
+        required_unless_present = "utcp"
+    )]
+    command: Option<String>,
 
     #[arg(help = "Arguments to pass to the server command")]
     args: Vec<String>,
@@ -55,34 +69,44 @@ async fn main() -> Result<()> {
         .with(log_buffer_layer)
         .init();
 
-    run_tui(&cli.command, &cli.args, log_buffer, cli.debug).await?;
+    run_tui(cli, log_buffer).await?;
 
     Ok(())
 }
 
-async fn run_tui(
-    command: &str,
-    args: &[String],
-    log_buffer: LogBuffer,
-    debug_mode: bool,
-) -> Result<()> {
+async fn run_tui(cli: Cli, log_buffer: LogBuffer) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let client = McpClient::new(command, args)
-        .await
-        .context("Failed to create MCP client")?;
+    // Create the appropriate client based on CLI arguments
+    let client: Box<dyn ProtocolClient> = if let Some(utcp_path) = &cli.utcp {
+        // UTCP mode
+        Box::new(
+            UtcpClient::new(utcp_path)
+                .await
+                .context("Failed to create UTCP client")?,
+        )
+    } else if let Some(command) = &cli.command {
+        // MCP mode
+        Box::new(
+            McpClient::new(command, &cli.args)
+                .await
+                .context("Failed to create MCP client")?,
+        )
+    } else {
+        anyhow::bail!("Either --utcp or command must be provided");
+    };
 
     client
         .initialize()
         .await
-        .context("Failed to initialize MCP client")?;
+        .context("Failed to initialize client")?;
 
-    let mut app = App::new(debug_mode);
-    let res = run_tui_loop(&mut terminal, &mut app, &client, log_buffer).await;
+    let mut app = App::new(cli.debug);
+    let res = run_tui_loop(&mut terminal, &mut app, client.as_ref(), log_buffer).await;
 
     disable_raw_mode()?;
     execute!(
@@ -100,7 +124,7 @@ async fn run_tui(
 async fn run_tui_loop<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
-    client: &McpClient,
+    client: &dyn ProtocolClient,
     log_buffer: LogBuffer,
 ) -> Result<()> {
     app.load_data(client).await?;

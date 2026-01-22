@@ -299,6 +299,258 @@ impl McpClient {
     }
 }
 
+// Helper function to extract text from PromptContent
+fn extract_prompt_content_text(content: &PromptContent) -> String {
+    match content {
+        PromptContent::Text { text } => text.clone(),
+        PromptContent::Image { mime_type, .. } => {
+            format!("[Image: {}]", mime_type)
+        }
+        PromptContent::Resource { resource } => match resource {
+            ResourceContents::Text { text, .. } => text.clone(),
+            ResourceContents::Blob { uri, .. } => {
+                format!("[Binary resource: {}]", uri)
+            }
+        },
+    }
+}
+
+// Implement ProtocolClient trait for MCP
+#[async_trait::async_trait]
+impl crate::protocol::ProtocolClient for McpClient {
+    async fn initialize(&self) -> Result<crate::protocol::ServerInfo> {
+        let result = self.initialize().await?;
+
+        let capabilities = vec![
+            if result.capabilities.tools.is_some() {
+                Some("Tools")
+            } else {
+                None
+            },
+            if result.capabilities.prompts.is_some() {
+                Some("Prompts")
+            } else {
+                None
+            },
+            if result.capabilities.resources.is_some() {
+                Some("Resources")
+            } else {
+                None
+            },
+        ]
+        .into_iter()
+        .flatten()
+        .map(String::from)
+        .collect();
+
+        Ok(crate::protocol::ServerInfo {
+            name: result.server_info.name,
+            version: result.server_info.version,
+            protocol_type: "MCP".to_string(),
+            capabilities,
+        })
+    }
+
+    async fn shutdown(&self) -> Result<()> {
+        self.shutdown().await
+    }
+
+    async fn list_tools(&self) -> Result<Vec<crate::protocol::ProtocolTool>> {
+        let tools = self.list_tools().await?;
+        Ok(tools
+            .into_iter()
+            .map(|t| crate::protocol::ProtocolTool {
+                name: t.name,
+                description: t.description,
+                input_schema: t.input_schema,
+            })
+            .collect())
+    }
+
+    async fn call_tool(
+        &self,
+        name: &str,
+        arguments: Option<HashMap<String, Value>>,
+    ) -> Result<crate::protocol::ToolCallResult> {
+        let result = self.call_tool(name, arguments).await?;
+
+        // Convert MCP ToolContent to protocol ContentItem
+        let content = result
+            .content
+            .into_iter()
+            .map(|item| match item {
+                ToolContent::Text { text } => crate::protocol::ContentItem::Text(text),
+                ToolContent::Image { data, mime_type } => {
+                    crate::protocol::ContentItem::Image { data, mime_type }
+                }
+                ToolContent::Resource { resource } => match resource {
+                    ResourceContents::Text { text, .. } => crate::protocol::ContentItem::Text(text),
+                    ResourceContents::Blob {
+                        blob, mime_type, ..
+                    } => {
+                        // Decode base64 blob
+                        use base64::{engine::general_purpose, Engine as _};
+                        let data = general_purpose::STANDARD.decode(&blob).unwrap_or_default();
+                        crate::protocol::ContentItem::Binary {
+                            data,
+                            mime_type: mime_type.unwrap_or_default(),
+                        }
+                    }
+                },
+            })
+            .collect();
+
+        Ok(crate::protocol::ToolCallResult {
+            content,
+            is_error: result.is_error.unwrap_or(false),
+        })
+    }
+
+    async fn list_prompts(&self) -> Result<Vec<crate::protocol::ProtocolPrompt>> {
+        let prompts = self.list_prompts().await?;
+        Ok(prompts
+            .into_iter()
+            .map(|p| crate::protocol::ProtocolPrompt {
+                name: p.name,
+                description: p.description,
+                arguments: p
+                    .arguments
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|a| crate::protocol::PromptArgument {
+                        name: a.name,
+                        description: a.description,
+                        required: a.required.unwrap_or(false),
+                    })
+                    .collect(),
+            })
+            .collect())
+    }
+
+    async fn get_prompt(
+        &self,
+        name: &str,
+        arguments: Option<HashMap<String, String>>,
+    ) -> Result<crate::protocol::PromptResult> {
+        let result = self.get_prompt(name, arguments).await?;
+
+        let messages = result
+            .messages
+            .into_iter()
+            .map(|m| {
+                // Extract text content from message
+                let content = match &m.content {
+                    PromptMessageContent::Single(prompt_content) => {
+                        extract_prompt_content_text(prompt_content)
+                    }
+                    PromptMessageContent::Multiple(contents) => contents
+                        .iter()
+                        .map(extract_prompt_content_text)
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                };
+
+                crate::protocol::PromptMessage {
+                    role: m.role,
+                    content,
+                }
+            })
+            .collect();
+
+        Ok(crate::protocol::PromptResult {
+            description: result.description,
+            messages,
+        })
+    }
+
+    async fn list_resources(&self) -> Result<Vec<crate::protocol::ProtocolResource>> {
+        let resources = self.list_resources().await?;
+        Ok(resources
+            .into_iter()
+            .map(|r| crate::protocol::ProtocolResource {
+                uri: r.uri,
+                name: r.name,
+                description: r.description,
+                mime_type: r.mime_type,
+            })
+            .collect())
+    }
+
+    async fn read_resource(&self, uri: &str) -> Result<crate::protocol::ResourceReadResult> {
+        let contents = self.read_resource(uri).await?;
+
+        let converted = contents
+            .into_iter()
+            .map(|item| match item {
+                ResourceContents::Text {
+                    uri,
+                    text,
+                    mime_type,
+                } => crate::protocol::ResourceContent::Text {
+                    uri,
+                    text,
+                    mime_type,
+                },
+                ResourceContents::Blob {
+                    uri,
+                    blob,
+                    mime_type,
+                } => {
+                    // Decode base64 blob
+                    use base64::{engine::general_purpose, Engine as _};
+                    let data = general_purpose::STANDARD.decode(&blob).unwrap_or_default();
+                    crate::protocol::ResourceContent::Binary {
+                        uri,
+                        data,
+                        mime_type,
+                    }
+                }
+            })
+            .collect();
+
+        Ok(crate::protocol::ResourceReadResult {
+            contents: converted,
+        })
+    }
+
+    async fn get_server_info(&self) -> Option<crate::protocol::ServerInfo> {
+        let info = self.get_server_info().await?;
+
+        let capabilities = vec![
+            if info.capabilities.tools.is_some() {
+                Some("Tools")
+            } else {
+                None
+            },
+            if info.capabilities.prompts.is_some() {
+                Some("Prompts")
+            } else {
+                None
+            },
+            if info.capabilities.resources.is_some() {
+                Some("Resources")
+            } else {
+                None
+            },
+        ]
+        .into_iter()
+        .flatten()
+        .map(String::from)
+        .collect();
+
+        Some(crate::protocol::ServerInfo {
+            name: info.server_info.name,
+            version: info.server_info.version,
+            protocol_type: "MCP".to_string(),
+            capabilities,
+        })
+    }
+
+    async fn get_logs(&self) -> Vec<String> {
+        self.get_logs().await
+    }
+}
+
 impl Drop for McpClient {
     fn drop(&mut self) {
         let child = self.child.clone();
