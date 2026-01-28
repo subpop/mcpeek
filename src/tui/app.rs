@@ -392,7 +392,7 @@ impl App {
             Tab::ServerInfo => {
                 if let Some(info) = &self.server_info {
                     let caps = &info.capabilities;
-                    let detail = format!(
+                    let mut detail = format!(
                         "Server: {} v{}\n\nProtocol Version: {}\n\nCapabilities:\n  Tools: {}\n  Prompts: {}\n  Resources: {}\n  Logging: {}",
                         info.server_info.name,
                         info.server_info.version,
@@ -402,6 +402,12 @@ impl App {
                         if caps.resources.is_some() { "Yes" } else { "No" },
                         if caps.logging.is_some() { "Yes" } else { "No" },
                     );
+                    if let Some(instructions) = &info.instructions {
+                        detail.push_str("\n\nInstructions:\n");
+                        for line in instructions.lines() {
+                            detail.push_str(&format!("  {}\n", line));
+                        }
+                    }
                     self.detail_view = Some(detail);
                 }
             }

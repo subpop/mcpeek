@@ -462,6 +462,7 @@ mod tests {
                 name: "test_server".to_string(),
                 version: "1.0.0".to_string(),
             },
+            instructions: None,
         };
 
         *server_info.lock().await = Some(info.clone());

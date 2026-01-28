@@ -315,6 +315,18 @@ fn render_server_info(f: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::from("  Logging: No"));
         }
 
+        if let Some(instructions) = &info.instructions {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Instructions:",
+                Style::default().add_modifier(Modifier::BOLD),
+            )));
+            // Split instructions into lines and add each as a separate line
+            for instruction_line in instructions.lines() {
+                lines.push(Line::from(format!("  {}", instruction_line)));
+            }
+        }
+
         Text::from(lines)
     } else {
         Text::from("No server information available")
